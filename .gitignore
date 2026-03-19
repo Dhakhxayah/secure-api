@@ -1,0 +1,8 @@
+# Compiled output — very large, never push this
+/target
+
+# Environment variables — contains secrets, never push this
+.env
+
+# Mac system file
+.DS_Store
