@@ -40,3 +40,9 @@ rand = "0.8"
 base64 = "0.21"
 sha2 = "0.10"
 hex = "0.4"
+
+[dev-dependencies]
+reqwest = { version = "0.11", features = ["json"] }
+tokio-test = "0.4"
+rand = "0.8"
+uuid = { version = "1", features = ["v4"] }
