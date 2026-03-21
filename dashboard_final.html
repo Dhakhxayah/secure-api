@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Secure API · Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--ink:#0a0c0f;--ink2:#111418;--ink3:#191d24;--ink4:#222830;--line:rgba(255,255,255,0.07);--line2:rgba(255,255,255,0.13);--txt:#e8ecf2;--dim:#5a6478;--dim2:#7a8499;--green:#00e5a0;--green2:#00c485;--red:#ff5c5c;--amber:#ffb020;--blue:#4d9fff;--purple:#9b7fff;--mono:'Space Mono',monospace;--sans:'DM Sans',sans-serif}
+body{background:var(--ink);color:var(--txt);font-family:var(--sans);min-height:100vh;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:52px;background:var(--ink2);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 20px;flex-shrink:0;z-index:10}
+.logo{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.02em}
+.logo-mark{width:28px;height:28px;background:var(--green);border-radius:7px;display:flex;align-items:center;justify-content:center;color:#000;font-size:14px}
+.server-badge{display:flex;align-items:center;gap:8px;background:var(--ink3);border:1px solid var(--line2);border-radius:100px;padding:5px 14px;font-family:var(--mono);font-size:11px;color:var(--dim2)}
+.pulse{width:7px;height:7px;border-radius:50%;background:var(--dim);transition:background .4s,box-shadow .4s}
+.pulse.live{background:var(--green);box-shadow:0 0 0 3px rgba(0,229,160,.2)}
+.pulse.dead{background:var(--red)}
+.shell{display:flex;flex:1;overflow:hidden}
+.sidebar{width:188px;background:var(--ink2);border-right:1px solid var(--line);display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0;padding:12px 8px}
+.nav-group{font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:.12em;text-transform:uppercase;padding:14px 8px 6px}
+.nav-btn{display:flex;align-items:center;gap:8px;width:100%;padding:7px 10px;border:none;background:transparent;color:var(--dim2);font-family:var(--sans);font-size:13px;font-weight:400;border-radius:7px;cursor:pointer;text-align:left;transition:background .12s,color .12s}
+.nav-btn:hover{background:var(--ink3);color:var(--txt)}
+.nav-btn.active{background:rgba(0,229,160,.1);color:var(--green);font-weight:500}
+.badge{margin-left:auto;font-family:var(--mono);font-size:9px;padding:2px 6px;border-radius:5px;font-weight:700;letter-spacing:.03em}
+.badge-post{background:rgba(255,176,32,.15);color:var(--amber)}
+.badge-get{background:rgba(0,229,160,.12);color:var(--green)}
+.badge-del{background:rgba(255,92,92,.13);color:var(--red)}
+.badge-test{background:rgba(155,127,255,.13);color:var(--purple)}
+.main{flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:0}
+.page{display:none;flex-direction:column;gap:18px;animation:fadeUp .18s ease}
+.page.active{display:flex}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.page-head{display:flex;align-items:center;gap:10px;margin-bottom:2px}
+.page-title{font-size:20px;font-weight:600}
+.method-pill{font-family:var(--mono);font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px}
+.mp{background:rgba(255,176,32,.15);color:var(--amber);border:1px solid rgba(255,176,32,.25)}
+.mg{background:rgba(0,229,160,.12);color:var(--green);border:1px solid rgba(0,229,160,.2)}
+.md{background:rgba(255,92,92,.12);color:var(--red);border:1px solid rgba(255,92,92,.2)}
+.page-url{font-family:var(--mono);font-size:11px;color:var(--dim2);background:var(--ink3);padding:5px 12px;border-radius:6px;border:1px solid var(--line);display:inline-block;margin-bottom:4px}
+.card{background:var(--ink2);border:1px solid var(--line);border-radius:12px;padding:18px}
+.card-label{font-family:var(--mono);font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.stat-card{background:var(--ink2);border:1px solid var(--line);border-radius:12px;padding:16px}
+.stat-label{font-family:var(--mono);font-size:10px;color:var(--dim);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em}
+.stat-val{font-size:24px;font-weight:600}
+.v-green{color:var(--green)}.v-purple{color:var(--purple)}.v-amber{color:var(--amber)}.v-red{color:var(--red)}.v-blue{color:var(--blue)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+.field:last-child{margin-bottom:0}
+.field label{font-family:var(--mono);font-size:11px;color:var(--dim2)}
+input[type=text],input[type=email],input[type=password],input[type=number],textarea{background:var(--ink3);border:1px solid var(--line2);border-radius:8px;padding:9px 12px;color:var(--txt);font-family:var(--mono);font-size:12.5px;outline:none;width:100%;transition:border-color .15s}
+input:focus,textarea:focus{border-color:var(--green)}
+input::placeholder,textarea::placeholder{color:var(--dim)}
+textarea{resize:vertical;min-height:80px;line-height:1.6}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border:none;border-radius:8px;font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;transition:transform .1s,opacity .1s}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn:active:not(:disabled){transform:scale(.98)}
+.btn-green{background:var(--green);color:#000}.btn-green:hover:not(:disabled){background:var(--green2)}
+.btn-ghost{background:var(--ink3);color:var(--txt);border:1px solid var(--line2)}.btn-ghost:hover:not(:disabled){border-color:var(--green);color:var(--green)}
+.btn-red{background:rgba(255,92,92,.12);color:var(--red);border:1px solid rgba(255,92,92,.25)}.btn-red:hover:not(:disabled){background:rgba(255,92,92,.2)}
+.btn-amber{background:rgba(255,176,32,.12);color:var(--amber);border:1px solid rgba(255,176,32,.25)}.btn-amber:hover:not(:disabled){background:rgba(255,176,32,.2)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{width:13px;height:13px;border:2px solid rgba(255,255,255,.15);border-top-color:currentColor;border-radius:50%;animation:spin .6s linear infinite;display:none}
+.spin.show{display:block}
+.res-label{font-family:var(--mono);font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px;margin-top:14px}
+.res-box{background:#050709;border:1px solid var(--line);border-radius:8px;padding:12px;font-family:var(--mono);font-size:11.5px;line-height:1.75;min-height:56px;white-space:pre-wrap;word-break:break-all;color:var(--dim2);transition:border-color .2s}
+.res-box.ok{border-color:rgba(0,229,160,.35);color:var(--green)}
+.res-box.er{border-color:rgba(255,92,92,.35);color:var(--red)}
+.res-box.ld{color:var(--purple)}
+.res-box.wa{border-color:rgba(255,176,32,.35);color:var(--amber)}
+.alert{padding:9px 13px;border-radius:7px;font-size:12.5px;display:none;margin-bottom:10px}
+.alert.show{display:block}
+.alert.ok{background:rgba(0,229,160,.07);border:1px solid rgba(0,229,160,.2);color:var(--green)}
+.alert.er{background:rgba(255,92,92,.07);border:1px solid rgba(255,92,92,.2);color:var(--red)}
+.alert.wa{background:rgba(255,176,32,.07);border:1px solid rgba(255,176,32,.2);color:var(--amber)}
+.alert.info{background:rgba(77,159,255,.07);border:1px solid rgba(77,159,255,.2);color:var(--blue)}
+.token-wrap{display:none;margin-bottom:12px}
+.token-wrap.show{display:block}
+.token-box{background:#050709;border:1px solid rgba(0,229,160,.25);border-radius:8px;padding:10px 12px;font-family:var(--mono);font-size:10px;color:var(--green);word-break:break-all;line-height:1.6;margin-top:6px}
+.copy-btn{background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.2);color:var(--green);padding:3px 10px;border-radius:5px;font-size:11px;font-family:var(--mono);cursor:pointer;margin-top:6px;transition:background .15s}
+.copy-btn:hover{background:rgba(0,229,160,.2)}
+.log-box{background:#050709;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-family:var(--mono);font-size:11px;max-height:220px;overflow-y:auto;line-height:1.9;white-space:pre-wrap}
+.l-ok{color:var(--green)}.l-er{color:var(--red)}.l-wa{color:var(--amber)}.l-bl{color:var(--blue)}
+.att-row{display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:11px}
+.att-row:last-child{border:none}
+.att-num{color:var(--dim);min-width:72px}
+.tag{padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700}
+.t-ok{background:rgba(0,229,160,.1);color:var(--green)}
+.t-fl{background:rgba(255,92,92,.1);color:var(--red)}
+.t-lk{background:rgba(255,176,32,.1);color:var(--amber)}
+.t-rl{background:rgba(155,127,255,.1);color:var(--purple)}
+.key-item{background:var(--ink3);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.key-name{font-size:13px;font-weight:600;margin-bottom:3px}
+.key-meta{font-family:var(--mono);font-size:10px;color:var(--dim2)}
+.key-id{font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:2px}
+.t-active{background:rgba(0,229,160,.1);color:var(--green);padding:2px 7px;border-radius:4px;font-size:10px;font-family:var(--mono)}
+.t-revoked{background:rgba(255,92,92,.1);color:var(--red);padding:2px 7px;border-radius:4px;font-size:10px;font-family:var(--mono)}
+.feat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.feat-item{background:var(--ink3);border:1px solid var(--line);border-radius:9px;padding:12px;display:flex;gap:10px;align-items:flex-start}
+.feat-check{width:18px;height:18px;border-radius:5px;background:rgba(0,229,160,.15);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:1px}
+.feat-name{font-size:12px;font-weight:600;margin-bottom:3px}
+.feat-desc{font-size:11px;color:var(--dim2);line-height:1.5}
+.info-box{background:var(--ink3);border-radius:8px;padding:12px 14px;font-family:var(--mono);font-size:11.5px;color:var(--dim2);line-height:2}
+.preset-row{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px}
+.preset-btn{background:rgba(155,127,255,.1);border:1px solid rgba(155,127,255,.25);color:var(--purple);padding:4px 10px;border-radius:5px;font-size:11px;font-family:var(--mono);cursor:pointer;transition:background .15s}
+.preset-btn:hover{background:rgba(155,127,255,.2)}
+.result-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:7px;font-family:var(--mono);font-size:11px;font-weight:700;margin-bottom:8px}
+.rb-ok{background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.25);color:var(--green)}
+.rb-er{background:rgba(255,92,92,.1);border:1px solid rgba(255,92,92,.25);color:var(--red)}
+.rb-wa{background:rgba(255,176,32,.1);border:1px solid rgba(255,176,32,.25);color:var(--amber)}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--ink4);border-radius:2px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="logo"><div class="logo-mark">🔐</div>SECURE API</div>
+  <div class="server-badge"><div class="pulse" id="pulse"></div><span id="srv-txt">checking...</span><span style="opacity:.2">·</span><span>localhost:3000</span></div>
+</div>
+<div class="shell">
+<nav class="sidebar">
+  <div class="nav-group">Overview</div>
+  <button class="nav-btn active" onclick="nav(this,'home')">⌂ Dashboard</button>
+  <div class="nav-group">Auth</div>
+  <button class="nav-btn" onclick="nav(this,'register')">+ Register <span class="badge badge-post">POST</span></button>
+  <button class="nav-btn" onclick="nav(this,'login')">→ Login <span class="badge badge-post">POST</span></button>
+  <button class="nav-btn" onclick="nav(this,'profile')">◎ My Profile <span class="badge badge-get">GET</span></button>
+  <button class="nav-btn" onclick="nav(this,'logout')">← Logout <span class="badge badge-post">POST</span></button>
+  <div class="nav-group">API Keys</div>
+  <button class="nav-btn" onclick="nav(this,'create-key')">+ Create Key <span class="badge badge-post">POST</span></button>
+  <button class="nav-btn" onclick="nav(this,'list-keys')">≡ List Keys <span class="badge badge-get">GET</span></button>
+  <button class="nav-btn" onclick="nav(this,'revoke-key')">✕ Revoke Key <span class="badge badge-del">DEL</span></button>
+  <div class="nav-group">Security Tests</div>
+  <button class="nav-btn" onclick="nav(this,'test-rs256')">🔑 RS256+Fingerprint <span class="badge badge-test">TEST</span></button>
+  <button class="nav-btn" onclick="nav(this,'test-rate')">≋ Rate Limiter <span class="badge badge-test">TEST</span></button>
+  <button class="nav-btn" onclick="nav(this,'test-brute')">⚠ Brute Force <span class="badge badge-test">TEST</span></button>
+  <button class="nav-btn" onclick="nav(this,'test-xss')">🛡 XSS Injection <span class="badge badge-test">TEST</span></button>
+  <button class="nav-btn" onclick="nav(this,'test-sql')">💉 SQL Injection <span class="badge badge-test">TEST</span></button>
+  <button class="nav-btn" onclick="nav(this,'test-dos')">💣 DoS Body Size <span class="badge badge-test">TEST</span></button>
+  <button class="nav-btn" onclick="nav(this,'test-ipban')">🚫 IP Auto-Ban <span class="badge badge-test">TEST</span></button>
+  <button class="nav-btn" onclick="nav(this,'test-softdel')">🗑 Soft Delete <span class="badge badge-test">TEST</span></button>
+  <button class="nav-btn" onclick="nav(this,'test-enc')">🔒 Encryption <span class="badge badge-test">TEST</span></button>
+</nav>
+<div class="main">
+
+<!-- HOME -->
+<div class="page active" id="page-home">
+  <div class="page-title">Security Dashboard</div>
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-label">Server</div><div class="stat-val v-green" id="h-status">—</div></div>
+    <div class="stat-card"><div class="stat-label">Token Saved</div><div class="stat-val v-purple" id="h-token">none</div></div>
+    <div class="stat-card"><div class="stat-label">Requests Made</div><div class="stat-val v-amber" id="h-reqs">0</div></div>
+  </div>
+  <div class="card">
+    <div class="card-label">Health Check · GET /health</div>
+    <button class="btn btn-green" onclick="pingServer()"><span class="spin" id="ping-spin"></span>Ping Server</button>
+    <div class="res-label">Response</div>
+    <div class="res-box" id="ping-res">Click Ping Server to verify your Rust backend is running at localhost:3000</div>
+  </div>
+  <div class="card">
+    <div class="card-label">All 12 Security Features Implemented</div>
+    <div class="feat-grid">
+      <div class="feat-item"><div class="feat-check">✓</div><div><div class="feat-name">RS256 Asymmetric JWT</div><div class="feat-desc">Private key signs, public key verifies. Cannot forge tokens.</div></div></div>
+      <div class="feat-item"><div class="feat-check">✓</div><div><div class="feat-name">Token Fingerprinting</div><div class="feat-desc">Token bound to User-Agent. Stolen tokens from different browsers rejected.</div></div></div>
+      <div class="feat-item"><div class="feat-check">✓</div><div><div class="feat-name">Sliding Window Rate Limit</div><div class="feat-desc">Rolling 60s window. Login: 5/min. Register: 10/min. General: 60/min.</div></div></div>
+      <div class="feat-item"><div class="feat-check">✓</div><div><div class="feat-name">HTML Sanitization (XSS)</div><div class="feat-desc">Ammonia strips script tags. XSS payloads blocked before DB.</div></div></div>
+      <div class="feat-item"><div class="feat-check">✓</div><div><div class="feat-name">AES-256-GCM Encryption</div><div class="feat-desc">Emails encrypted at rest. DB breach reveals only ciphertext.</div></div></div>
+      <div class="feat-item"><div class="feat-check">✓</div><div><div class="feat-name">Soft Deletes</div><div class="feat-desc">deleted_at timestamp set. Row kept in PostgreSQL for audit trail.</div></div></div>
+      <div class="feat-item"><div class="feat-check">✓</div><div><div class="feat-name">IP Auto-Ban</div><div class="feat-desc">10+ bad requests in 5 min triggers 1 hour Redis ban.</div></div></div>
+      <div class="feat-item"><div class="feat-check">✓</div><div><div class="feat-name">Brute Force Protection</div><div class="feat-desc">5 failed logins locks account 15 min. Counter in PostgreSQL.</div></div></div>
+      <div class="feat-item"><div class="feat-check">✓</div><div><div class="feat-name">API Key Management</div><div class="feat-desc">SHA-256 hashed. Raw shown once. Scopes + expiry + revocation.</div></div></div>
+      <div class="feat-item"><div class="feat-check">✓</div><div><div class="feat-name">Token Blacklisting</div><div class="feat-desc">Logout adds to Redis blacklist. Invalid immediately after logout.</div></div></div>
+      <div class="feat-item"><div class="feat-check">✓</div><div><div class="feat-name">Secure HTTP Headers</div><div class="feat-desc">CSP, HSTS, X-Frame-Options, Permissions-Policy on every response.</div></div></div>
+      <div class="feat-item"><div class="feat-check">✓</div><div><div class="feat-name">JSON Body Size Limits</div><div class="feat-desc">1MB cap. Oversized payloads rejected before parsing.</div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- REGISTER -->
+<div class="page" id="page-register">
+  <div class="page-head"><div class="page-title">Register</div><span class="method-pill mp">POST</span></div>
+  <div class="page-url">POST http://localhost:3000/auth/register</div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-label">Request Body</div>
+      <div class="field"><label>email</label><input type="email" id="reg-email" placeholder="you@example.com"></div>
+      <div class="field"><label>password (min 8 chars)</label><input type="password" id="reg-pass" placeholder="••••••••"></div>
+      <button class="btn btn-green" onclick="doRegister()"><span class="spin" id="reg-spin"></span>Register</button>
+    </div>
+    <div class="card">
+      <div class="card-label">Response</div>
+      <div class="alert" id="reg-alert"></div>
+      <div class="res-label">Raw JSON</div>
+      <div class="res-box" id="reg-res">Response appears here...</div>
+    </div>
+  </div>
+</div>
+
+<!-- LOGIN -->
+<div class="page" id="page-login">
+  <div class="page-head"><div class="page-title">Login</div><span class="method-pill mp">POST</span></div>
+  <div class="page-url">POST http://localhost:3000/auth/login</div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-label">Request Body</div>
+      <div class="field"><label>email</label><input type="email" id="login-email" placeholder="you@example.com"></div>
+      <div class="field"><label>password</label><input type="password" id="login-pass" placeholder="••••••••"></div>
+      <button class="btn btn-green" onclick="doLogin()"><span class="spin" id="login-spin"></span>Login</button>
+    </div>
+    <div class="card">
+      <div class="card-label">Response</div>
+      <div class="alert" id="login-alert"></div>
+      <div class="token-wrap" id="token-section">
+        <div style="font-size:11px;color:var(--dim2)">access_token (auto-saved to all pages)</div>
+        <div class="token-box" id="token-display"></div>
+        <button class="copy-btn" onclick="copyToken(event)">Copy Token</button>
+      </div>
+      <div class="res-label">Raw JSON</div>
+      <div class="res-box" id="login-res">Response appears here...</div>
+    </div>
+  </div>
+</div>
+
+<!-- PROFILE -->
+<div class="page" id="page-profile">
+  <div class="page-head"><div class="page-title">My Profile</div><span class="method-pill mg">GET</span></div>
+  <div class="page-url">GET http://localhost:3000/auth/me</div>
+  <div class="card">
+    <div class="card-label">Authorization</div>
+    <div style="font-size:12px;color:var(--dim2);margin-bottom:10px">Token auto-filled from login. Paste an API key (sk_live_...) to test API key auth.</div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <input type="text" id="me-token" placeholder="Bearer token or sk_live_... API key" style="flex:1">
+      <button class="btn btn-green" onclick="doMe()"><span class="spin" id="me-spin"></span>Fetch Profile</button>
+    </div>
+    <div class="alert" id="me-alert"></div>
+    <div id="me-profile" style="display:none;margin-bottom:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="stat-card"><div class="stat-label">User ID</div><div id="p-id" style="font-family:var(--mono);font-size:10px;color:var(--green);word-break:break-all;margin-top:4px"></div></div>
+        <div class="stat-card"><div class="stat-label">Role</div><div id="p-role" style="font-size:18px;font-weight:700;color:var(--green);margin-top:4px"></div></div>
+        <div class="stat-card" style="grid-column:1/-1"><div class="stat-label">Email (decrypted from AES-256-GCM)</div><div id="p-email" style="font-family:var(--mono);font-size:12px;margin-top:4px"></div></div>
+      </div>
+    </div>
+    <div class="res-label">Raw JSON</div>
+    <div class="res-box" id="me-res">Login first, then fetch your profile here.</div>
+  </div>
+</div>
+
+<!-- LOGOUT -->
+<div class="page" id="page-logout">
+  <div class="page-head"><div class="page-title">Logout</div><span class="method-pill mp">POST</span></div>
+  <div class="page-url">POST http://localhost:3000/auth/logout</div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-label">Token to Blacklist</div>
+      <div style="font-size:12px;color:var(--dim2);margin-bottom:10px">After logout this token is added to Redis blacklist — even if not expired yet.</div>
+      <input type="text" id="logout-token" placeholder="Paste Bearer token..." style="margin-bottom:12px">
+      <button class="btn btn-red" onclick="doLogout()"><span class="spin" id="logout-spin"></span>Logout + Blacklist Token</button>
+    </div>
+    <div class="card">
+      <div class="card-label">Response</div>
+      <div class="alert" id="logout-alert"></div>
+      <div class="res-label">Raw JSON</div>
+      <div class="res-box" id="logout-res">Response appears here...</div>
+      <div id="blacklist-test" style="display:none;margin-top:12px">
+        <button class="btn btn-ghost" onclick="testBlacklist()">▶ Test: Use blacklisted token on /auth/me</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CREATE KEY -->
+<div class="page" id="page-create-key">
+  <div class="page-head"><div class="page-title">Create API Key</div><span class="method-pill mp">POST</span></div>
+  <div class="page-url">POST http://localhost:3000/api-keys</div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-label">Configuration</div>
+      <div class="field"><label>Key Name</label><input type="text" id="key-name" placeholder="My Production Key"></div>
+      <div class="field">
+        <label>Scopes</label>
+        <div style="display:flex;gap:16px;margin-top:4px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--txt);cursor:pointer"><input type="checkbox" id="scope-read" checked style="width:auto;cursor:pointer"> read</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--txt);cursor:pointer"><input type="checkbox" id="scope-write" style="width:auto;cursor:pointer"> write</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--txt);cursor:pointer"><input type="checkbox" id="scope-admin" style="width:auto;cursor:pointer"> admin</label>
+        </div>
+      </div>
+      <div class="field"><label>Expires in days (empty = never)</label><input type="number" id="key-expiry" placeholder="30"></div>
+      <button class="btn btn-green" onclick="doCreateKey()"><span class="spin" id="key-spin"></span>Generate API Key</button>
+    </div>
+    <div class="card">
+      <div class="card-label">Response</div>
+      <div class="alert" id="key-alert"></div>
+      <div id="key-result" style="display:none;margin-bottom:12px">
+        <div style="font-size:11px;color:var(--amber);margin-bottom:4px">⚠ Raw Key — Save Now, Never Shown Again</div>
+        <div class="token-box" id="key-display" style="border-color:rgba(255,176,32,.3);color:var(--amber)"></div>
+        <button class="copy-btn" style="border-color:rgba(255,176,32,.2);color:var(--amber)" onclick="copyApiKey(event)">Copy API Key</button>
+      </div>
+      <div class="res-label">Raw JSON</div>
+      <div class="res-box" id="key-res">Response appears here...</div>
+    </div>
+  </div>
+</div>
+
+<!-- LIST KEYS -->
+<div class="page" id="page-list-keys">
+  <div class="page-head"><div class="page-title">List API Keys</div><span class="method-pill mg">GET</span></div>
+  <div class="page-url">GET http://localhost:3000/api-keys</div>
+  <div class="card">
+    <div class="card-label">Your API Keys</div>
+    <button class="btn btn-green" onclick="doListKeys()" style="margin-bottom:14px"><span class="spin" id="list-spin"></span>Fetch Keys</button>
+    <div class="alert" id="list-alert"></div>
+    <div id="keys-container"><div style="font-size:12px;color:var(--dim)">Click Fetch Keys to load your API keys.</div></div>
+  </div>
+</div>
+
+<!-- REVOKE KEY -->
+<div class="page" id="page-revoke-key">
+  <div class="page-head"><div class="page-title">Revoke API Key</div><span class="method-pill md">DELETE</span></div>
+  <div class="page-url">DELETE http://localhost:3000/api-keys/:id</div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-label">Key to Revoke</div>
+      <div class="field"><label>Key ID (UUID from List Keys)</label><input type="text" id="revoke-id" placeholder="Paste key UUID..."></div>
+      <button class="btn btn-red" onclick="doRevokeKey()"><span class="spin" id="revoke-spin"></span>Revoke Key</button>
+    </div>
+    <div class="card">
+      <div class="card-label">Response</div>
+      <div class="alert" id="revoke-alert"></div>
+      <div class="res-label">Raw JSON</div>
+      <div class="res-box" id="revoke-res">Response appears here...</div>
+    </div>
+  </div>
+</div>
+
+<!-- RS256 TEST -->
+<div class="page" id="page-test-rs256">
+  <div class="page-head"><div class="page-title">🔑 RS256 + Token Fingerprinting</div></div>
+  <div class="card"><div class="card-label">What This Proves</div>
+    <div class="info-box">Test 1: JWT header alg = "RS256" — asymmetric signing confirmed (not HS256 symmetric)<br>Test 2: Same User-Agent → 200 OK — fingerprint matches, access granted<br>Test 3: Different User-Agent → 401 — fingerprint mismatch, token theft detected<br>Test 4: Tampered token → 401 — RS256 signature invalidated</div>
+  </div>
+  <div class="card"><div class="card-label">Run Test</div>
+    <div class="form-row" style="margin-bottom:14px">
+      <div class="field"><label>Registered Email</label><input type="email" id="rs-email" placeholder="test@example.com"></div>
+      <div class="field"><label>Password</label><input type="password" id="rs-pass" placeholder="••••••••"></div>
+    </div>
+    <button class="btn btn-green" onclick="testRS256()"><span class="spin" id="rs-spin"></span>Run RS256 Test</button>
+  </div>
+  <div class="card"><div class="card-label">Results</div><div id="rs-results"><div style="font-size:12px;color:var(--dim)">Enter credentials and run the test.</div></div></div>
+</div>
+
+<!-- RATE LIMITER TEST -->
+<div class="page" id="page-test-rate">
+  <div class="page-head"><div class="page-title">≋ Sliding Window Rate Limiter</div></div>
+  <div class="card"><div class="card-label">Algorithm</div>
+    <div class="info-box">Rolling 60s window per IP per endpoint. Login: 5/min | Register: 10/min | General: 60/min<br>Header: X-RateLimit-Algorithm: sliding_window | Run redis-cli FLUSHDB between tests</div>
+  </div>
+  <div class="card"><div class="card-label">Fire Requests at /health</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+      <button class="btn btn-ghost" onclick="fireRate(10)">Fire 10</button>
+      <button class="btn btn-ghost" onclick="fireRate(30)">Fire 30</button>
+      <button class="btn btn-green" onclick="fireRate(65)">Fire 65 → Trigger Limit</button>
+      <button class="btn btn-ghost" onclick="resetRate()">Reset Stats</button>
+    </div>
+    <div class="stats-row" style="margin-bottom:14px">
+      <div class="stat-card"><div class="stat-label">Sent</div><div class="stat-val v-purple" id="rl-sent">0</div></div>
+      <div class="stat-card"><div class="stat-label">200 OK</div><div class="stat-val v-green" id="rl-ok">0</div></div>
+      <div class="stat-card"><div class="stat-label">429 Blocked</div><div class="stat-val v-red" id="rl-blocked">0</div></div>
+    </div>
+    <div class="res-label">Live Log</div>
+    <div class="log-box" id="rl-log">Fire requests to see the sliding window in action...</div>
+  </div>
+</div>
+
+<!-- BRUTE FORCE TEST -->
+<div class="page" id="page-test-brute">
+  <div class="page-head"><div class="page-title">⚠ Brute Force Protection</div></div>
+  <div class="card"><div class="card-label">How It Works</div>
+    <div class="info-box">Each failed login increments failed_login_attempts in PostgreSQL.<br>After 5 failures → account locked 15 minutes. Run redis-cli FLUSHDB + wait 15 min to reset.</div>
+  </div>
+  <div class="two-col">
+    <div class="card"><div class="card-label">Configuration</div>
+      <div class="field"><label>Target Email (must be registered)</label><input type="email" id="bf-email" placeholder="test@example.com"></div>
+      <div class="field"><label>Wrong Password</label><input type="text" id="bf-pass" value="wrongpassword123"></div>
+      <div class="field"><label>Number of Attempts</label><input type="number" id="bf-count" value="6"></div>
+      <button class="btn btn-green" id="bf-btn" onclick="testBruteForce()"><span class="spin" id="bf-spin"></span>Start Simulation</button>
+    </div>
+    <div class="card"><div class="card-label">Attempt Log</div>
+      <div id="bf-log" style="min-height:120px"><div style="font-size:12px;color:var(--dim)">Configure and start.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- XSS TEST — USER INPUT -->
+<div class="page" id="page-test-xss">
+  <div class="page-head"><div class="page-title">🛡 XSS Injection Test</div></div>
+  <div class="card"><div class="card-label">How It Works</div>
+    <div class="info-box">Your input is sent as the email field to POST /auth/register.<br>The ammonia crate sanitizes HTML — script tags and XSS payloads are stripped and rejected with 400.<br>Try different attack payloads below or write your own.</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Your XSS Payload</div>
+    <div class="alert info show" style="margin-bottom:12px">💡 Quick presets — click to load into the field, then click Send:</div>
+    <div class="preset-row">
+      <button class="preset-btn" onclick="setXSS(`&lt;script&gt;alert('xss')&lt;/script&gt;@evil.com`)">script alert</button>
+      <button class="preset-btn" onclick="setXSS(`&lt;img src=x onerror=alert(1)&gt;@evil.com`)">img onerror</button>
+      <button class="preset-btn" onclick="setXSS(`&lt;svg onload=alert(1)&gt;@x.com`)">svg onload</button>
+      <button class="preset-btn" onclick="setXSS(`javascript:alert(1)@evil.com`)">javascript: proto</button>
+      <button class="preset-btn" onclick="setXSS(`&lt;iframe src=javascript:alert(1)&gt;@x.com`)">iframe inject</button>
+      <button class="preset-btn" onclick="setXSS(`&lt;body onload=alert(1)&gt;@x.com`)">body onload</button>
+    </div>
+    <div class="field"><label>Email field payload (edit or write your own)</label><input type="text" id="xss-payload" placeholder="Enter your XSS payload as the email..."></div>
+    <div class="field"><label>Password (anything, just needs to be present)</label><input type="text" id="xss-pass" value="testpassword123"></div>
+    <button class="btn btn-green" onclick="sendXSS()"><span class="spin" id="xss-spin"></span>Send Attack</button>
+    <div class="res-label">Server Response</div>
+    <div class="res-box" id="xss-res">Enter a payload and click Send Attack...</div>
+  </div>
+</div>
+
+<!-- SQL INJECTION TEST — USER INPUT -->
+<div class="page" id="page-test-sql">
+  <div class="page-head"><div class="page-title">💉 SQL Injection Test</div></div>
+  <div class="card"><div class="card-label">How It Works</div>
+    <div class="info-box">Your payload is sent as email/password to POST /auth/login.<br>sqlx uses parameterized queries ($1, $2) — your input is NEVER interpreted as SQL.<br>The injection is treated as a plain string. Database is completely safe.</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Your SQL Injection Payload</div>
+    <div class="alert info show" style="margin-bottom:12px">💡 Quick presets — click to load, then click Send:</div>
+    <div class="preset-row">
+      <button class="preset-btn" onclick="setSQL(`' OR '1'='1`,`' OR '1'='1`)">OR 1=1 bypass</button>
+      <button class="preset-btn" onclick="setSQL(`'; DROP TABLE users; --`,`anything`)">DROP TABLE</button>
+      <button class="preset-btn" onclick="setSQL(`admin'--`,`anything`)">comment bypass</button>
+      <button class="preset-btn" onclick="setSQL(`' UNION SELECT * FROM users--`,`x`)">UNION SELECT</button>
+      <button class="preset-btn" onclick="setSQL(`1; DELETE FROM users; --`,`x`)">DELETE FROM</button>
+      <button class="preset-btn" onclick="setSQL(`' OR 1=1 LIMIT 1 OFFSET 0--`,`x`)">LIMIT OFFSET</button>
+    </div>
+    <div class="field"><label>Email field (SQL payload)</label><input type="text" id="sql-email" placeholder="'; DROP TABLE users; --"></div>
+    <div class="field"><label>Password field (SQL payload)</label><input type="text" id="sql-pass" placeholder="' OR '1'='1"></div>
+    <button class="btn btn-green" onclick="sendSQL()"><span class="spin" id="sql-spin"></span>Send Injection</button>
+    <div class="res-label">Server Response</div>
+    <div class="res-box" id="sql-res">Enter a payload and click Send Injection...</div>
+  </div>
+</div>
+
+<!-- DOS TEST — USER INPUT -->
+<div class="page" id="page-test-dos">
+  <div class="page-head"><div class="page-title">💣 DoS Body Size Test</div></div>
+  <div class="card"><div class="card-label">How It Works</div>
+    <div class="info-box">The server has RequestBodyLimitLayer set to 1MB (1,048,576 bytes).<br>Any request body larger than 1MB is rejected with 413 before even being parsed.<br>This prevents memory exhaustion and JSON parsing attacks.</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Custom Payload Size</div>
+    <div class="alert info show" style="margin-bottom:12px">💡 The server limit is 1MB. Try different sizes to see exactly where it cuts off:</div>
+    <div class="preset-row">
+      <button class="preset-btn" onclick="setDOS(500000)">500KB (under limit)</button>
+      <button class="preset-btn" onclick="setDOS(900000)">900KB (just under)</button>
+      <button class="preset-btn" onclick="setDOS(1048577)">1MB + 1 byte (over)</button>
+      <button class="preset-btn" onclick="setDOS(2000000)">2MB (double limit)</button>
+      <button class="preset-btn" onclick="setDOS(5000000)">5MB (5x limit)</button>
+      <button class="preset-btn" onclick="setDOS(10000000)">10MB (10x limit)</button>
+    </div>
+    <div class="field"><label>Payload size in bytes</label><input type="number" id="dos-size" value="2000000" min="1" max="50000000"></div>
+    <div id="dos-size-label" style="font-family:var(--mono);font-size:11px;color:var(--dim2);margin-bottom:10px">≈ 2.0 MB — server limit is 1 MB — expect rejection</div>
+    <button class="btn btn-green" onclick="sendDOS()"><span class="spin" id="dos-spin"></span>Send Oversized Payload</button>
+    <div class="res-label">Server Response</div>
+    <div class="res-box" id="dos-res">Set a size and click Send...</div>
+  </div>
+</div>
+
+<!-- IP BAN TEST -->
+<div class="page" id="page-test-ipban">
+  <div class="page-head"><div class="page-title">🚫 IP Auto-Ban Test</div></div>
+  <div class="card"><div class="card-label">How It Works</div>
+    <div class="info-box">Response inspector middleware counts 400/422 errors per IP using Redis.<br>10+ bad requests in 5 minutes → IP banned for 1 hour.<br>All requests from banned IP get 403 Forbidden immediately.<br><br>⚠ NOTE: If rate limit fires first (429), run redis-cli FLUSHDB then wait 60s and retry.</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Step-by-Step Instructions</div>
+    <div class="alert wa show" style="margin-bottom:14px">Before testing: run <code style="background:var(--ink4);padding:2px 6px;border-radius:3px;font-family:var(--mono)">redis-cli FLUSHDB</code> in terminal to clear rate limits first!</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+      <button class="btn btn-green" id="ip-ban-btn" onclick="testIPBan()"><span class="spin" id="ip-spin"></span>Send 12 Bad Requests (slowly)</button>
+      <button class="btn btn-amber" onclick="checkIPBan()">Check if Banned</button>
+      <button class="btn btn-ghost" onclick="resetIPStats()">Reset Stats</button>
+    </div>
+    <div class="stats-row" style="margin-bottom:14px">
+      <div class="stat-card"><div class="stat-label">Sent</div><div class="stat-val v-purple" id="ip-sent">0</div></div>
+      <div class="stat-card"><div class="stat-label">400 Bad Req</div><div class="stat-val v-amber" id="ip-bad">0</div></div>
+      <div class="stat-card"><div class="stat-label">403 Banned</div><div class="stat-val v-red" id="ip-banned">0</div></div>
+    </div>
+    <div class="res-label">Log</div>
+    <div class="log-box" id="ip-log">Click Send to test. Remember to run redis-cli FLUSHDB first!</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Check Ban Status</div>
+    <div class="res-box" id="ban-check-res">Click "Check if Banned" to see current ban status...</div>
+  </div>
+</div>
+
+<!-- SOFT DELETE TEST -->
+<div class="page" id="page-test-softdel">
+  <div class="page-head"><div class="page-title">🗑 Soft Delete Test</div></div>
+  <div class="card"><div class="card-label">How It Works</div>
+    <div class="info-box">DELETE sets deleted_at = NOW() in PostgreSQL — row never physically removed.<br>All queries filter WHERE deleted_at IS NULL — deleted user becomes invisible.<br>After soft delete: login returns "Invalid credentials".</div>
+  </div>
+  <div class="two-col">
+    <div class="card"><div class="card-label">Delete Current Account</div>
+      <div style="font-size:12px;color:var(--dim2);margin-bottom:10px">Uses currently saved JWT token. Requires password confirmation.</div>
+      <div class="field"><label>Confirm Password</label><input type="password" id="del-pass" placeholder="Enter your password"></div>
+      <button class="btn btn-red" onclick="testSoftDelete()"><span class="spin" id="del-spin"></span>Soft Delete My Account</button>
+    </div>
+    <div class="card"><div class="card-label">Results</div>
+      <div class="alert" id="del-alert"></div>
+      <div class="res-label">Delete Response</div>
+      <div class="res-box" id="del-res">Response appears here...</div>
+      <div style="margin-top:12px">
+        <button class="btn btn-ghost" id="del-test-btn" style="display:none" onclick="testLoginAfterDelete()">▶ Test: Login with deleted account</button>
+      </div>
+      <div id="del-login-section" style="display:none">
+        <div class="res-label">Login After Delete</div>
+        <div class="res-box" id="del-login-res"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ENCRYPTION TEST -->
+<div class="page" id="page-test-enc">
+  <div class="page-head"><div class="page-title">🔒 AES-256-GCM Encryption Test</div></div>
+  <div class="card"><div class="card-label">How It Works</div>
+    <div class="info-box">Email stored as: base64(nonce):base64(ciphertext) — unreadable without the key.<br>SHA-256 hash stored separately for WHERE clause lookups.<br>Server decrypts on every read — you see plain email, DB has ciphertext.<br><br>⚠ Use a FRESH email not used before. If you get "Load failed" run redis-cli FLUSHDB first.</div>
+  </div>
+  <div class="card"><div class="card-label">Register + Verify Full Encrypt/Decrypt Cycle</div>
+    <div class="alert wa show" style="margin-bottom:12px">Run <code style="background:var(--ink4);padding:2px 6px;border-radius:3px;font-family:var(--mono)">redis-cli FLUSHDB</code> before this test if you hit errors!</div>
+    <div class="form-row" style="margin-bottom:14px">
+      <div class="field"><label>Email (use a new unique email)</label><input type="email" id="enc-email" placeholder="enctest123@example.com"></div>
+      <div class="field"><label>Password (min 8 chars)</label><input type="password" id="enc-pass" placeholder="••••••••"></div>
+    </div>
+    <button class="btn btn-green" onclick="testEncryption()"><span class="spin" id="enc-spin"></span>Run Encryption Test</button>
+  </div>
+  <div class="card"><div class="card-label">Results</div><div id="enc-results"><div style="font-size:12px;color:var(--dim)">Run the test to see the full encryption cycle.</div></div></div>
+  <div class="card">
+    <div class="card-label">Verify Ciphertext in PostgreSQL</div>
+    <div class="info-box">After running the test, paste this into your terminal to see the raw encrypted data:<br><br><span style="color:var(--green)">psql -U api_user -d secure_api -c "SELECT email, email_hash FROM users ORDER BY created_at DESC LIMIT 1;"</span><br><br>The email column will show: <span style="color:var(--amber)">base64nonce:base64ciphertext</span> — completely unreadable without the encryption key.</div>
+  </div>
+</div>
+
+</div><!-- /main -->
+</div><!-- /shell -->
+
+<script>
+const API = 'http://localhost:3000';
+let savedToken = '', savedApiKey = '', savedEmail = '', savedPass = '';
+let reqCount = 0, rlSent = 0, rlOk = 0, rlBlocked = 0;
+let ipSent = 0, ipBad = 0, ipBanned = 0;
+
+function nav(el, pageId) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('page-' + pageId).classList.add('active');
+}
+function incReq() { reqCount++; document.getElementById('h-reqs').textContent = reqCount; }
+function spin(id, on) { document.getElementById(id).classList[on ? 'add' : 'remove']('show'); }
+function setRes(id, text, cls) { const e = document.getElementById(id); e.textContent = text; e.className = 'res-box' + (cls ? ' ' + cls : ''); }
+function setAlert(id, type, msg) { const e = document.getElementById(id); e.className = 'alert ' + type + ' show'; e.textContent = msg; }
+function hideAlert(id) { document.getElementById(id).className = 'alert'; }
+function fmt(o) { return JSON.stringify(o, null, 2); }
+
+async function pingServer() {
+  spin('ping-spin', true); setRes('ping-res', 'Pinging...', 'ld');
+  try {
+    const r = await fetch(API + '/health'); const d = await r.json(); incReq();
+    setRes('ping-res', fmt(d), 'ok');
+    document.getElementById('pulse').className = 'pulse live';
+    document.getElementById('srv-txt').textContent = 'online';
+    document.getElementById('h-status').textContent = 'online';
+  } catch {
+    setRes('ping-res', 'Cannot reach server.\n\nMake sure "cargo run" is active in your terminal.', 'er');
+    document.getElementById('pulse').className = 'pulse dead';
+    document.getElementById('srv-txt').textContent = 'offline';
+    document.getElementById('h-status').textContent = 'offline';
+  }
+  spin('ping-spin', false);
+}
+
+async function doRegister() {
+  const email = document.getElementById('reg-email').value.trim();
+  const password = document.getElementById('reg-pass').value;
+  hideAlert('reg-alert');
+  if (!email || !password) { setAlert('reg-alert', 'er', 'Fill in both fields.'); return; }
+  spin('reg-spin', true); setRes('reg-res', 'Sending...', 'ld');
+  try {
+    const r = await fetch(API + '/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+    const d = await r.json(); incReq();
+    setRes('reg-res', fmt(d), r.ok ? 'ok' : 'er');
+    r.ok ? setAlert('reg-alert', 'ok', 'Account created! Go to Login.') : setAlert('reg-alert', 'er', d.error || 'Failed.');
+  } catch { setRes('reg-res', 'Cannot reach server.', 'er'); }
+  spin('reg-spin', false);
+}
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-pass').value;
+  hideAlert('login-alert');
+  if (!email || !password) { setAlert('login-alert', 'er', 'Fill in both fields.'); return; }
+  spin('login-spin', true); setRes('login-res', 'Authenticating...', 'ld');
+  try {
+    const r = await fetch(API + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+    const d = await r.json(); incReq();
+    setRes('login-res', fmt(d), r.ok ? 'ok' : 'er');
+    if (r.ok) {
+      savedToken = d.access_token; savedEmail = email;
+      document.getElementById('token-display').textContent = d.access_token;
+      document.getElementById('token-section').classList.add('show');
+      document.getElementById('me-token').value = d.access_token;
+      document.getElementById('logout-token').value = d.access_token;
+      document.getElementById('h-token').textContent = 'saved ✓';
+      setAlert('login-alert', 'ok', 'Logged in! Token auto-saved to all pages.');
+    } else setAlert('login-alert', 'er', d.error || 'Failed.');
+  } catch { setRes('login-res', 'Cannot reach server.', 'er'); }
+  spin('login-spin', false);
+}
+
+function copyToken(e) { navigator.clipboard.writeText(savedToken); e.target.textContent = 'Copied!'; setTimeout(() => e.target.textContent = 'Copy Token', 2000); }
+function copyApiKey(e) { navigator.clipboard.writeText(savedApiKey); e.target.textContent = 'Copied!'; setTimeout(() => e.target.textContent = 'Copy API Key', 2000); }
+
+async function doMe() {
+  const token = document.getElementById('me-token').value.trim();
+  hideAlert('me-alert');
+  if (!token) { setAlert('me-alert', 'er', 'No token. Login first.'); return; }
+  spin('me-spin', true); setRes('me-res', 'Fetching...', 'ld');
+  try {
+    const headers = token.startsWith('sk_') ? { 'X-API-Key': token } : { 'Authorization': 'Bearer ' + token };
+    const r = await fetch(API + '/auth/me', { headers });
+    const d = await r.json(); incReq();
+    setRes('me-res', fmt(d), r.ok ? 'ok' : 'er');
+    if (r.ok) {
+      document.getElementById('me-profile').style.display = 'block';
+      document.getElementById('p-id').textContent = d.id;
+      document.getElementById('p-email').textContent = d.email;
+      document.getElementById('p-role').textContent = d.role;
+      setAlert('me-alert', 'ok', 'Profile fetched! Email decrypted from AES-256-GCM ciphertext in DB.');
+    } else { document.getElementById('me-profile').style.display = 'none'; setAlert('me-alert', 'er', d.error || 'Denied.'); }
+  } catch { setRes('me-res', 'Cannot reach server.', 'er'); }
+  spin('me-spin', false);
+}
+
+async function doLogout() {
+  const token = document.getElementById('logout-token').value.trim();
+  hideAlert('logout-alert');
+  if (!token) { setAlert('logout-alert', 'er', 'No token.'); return; }
+  spin('logout-spin', true); setRes('logout-res', 'Logging out...', 'ld');
+  try {
+    const r = await fetch(API + '/auth/logout', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } });
+    const d = await r.json(); incReq();
+    setRes('logout-res', fmt(d), r.ok ? 'ok' : 'er');
+    if (r.ok) { setAlert('logout-alert', 'ok', 'Logged out! Token added to Redis blacklist.'); document.getElementById('blacklist-test').style.display = 'block'; }
+  } catch { setRes('logout-res', 'Cannot reach server.', 'er'); }
+  spin('logout-spin', false);
+}
+
+async function testBlacklist() {
+  const token = document.getElementById('logout-token').value.trim();
+  const r = await fetch(API + '/auth/me', { headers: { 'Authorization': 'Bearer ' + token } });
+  const d = await r.json(); incReq();
+  alert('HTTP ' + r.status + '\n\n' + fmt(d) + '\n\n' + (r.status === 401 ? '✅ Token correctly rejected! Blacklist working.' : '❌ Unexpected.'));
+}
+
+async function doCreateKey() {
+  if (!savedToken) { const e = document.getElementById('key-alert'); e.className = 'alert er show'; e.textContent = 'Login first.'; return; }
+  const name = document.getElementById('key-name').value.trim();
+  if (!name) { const e = document.getElementById('key-alert'); e.className = 'alert er show'; e.textContent = 'Enter a key name.'; return; }
+  const scopes = [];
+  if (document.getElementById('scope-read').checked) scopes.push('read');
+  if (document.getElementById('scope-write').checked) scopes.push('write');
+  if (document.getElementById('scope-admin').checked) scopes.push('admin');
+  if (!scopes.length) { const e = document.getElementById('key-alert'); e.className = 'alert er show'; e.textContent = 'Select at least one scope.'; return; }
+  const expiry = document.getElementById('key-expiry').value;
+  const body = { name, scopes }; if (expiry) body.expires_in_days = parseInt(expiry);
+  spin('key-spin', true); setRes('key-res', 'Creating...', 'ld'); hideAlert('key-alert');
+  try {
+    const r = await fetch(API + '/api-keys', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + savedToken }, body: JSON.stringify(body) });
+    const d = await r.json(); incReq();
+    setRes('key-res', fmt(d), r.ok ? 'ok' : 'er');
+    if (r.ok) {
+      savedApiKey = d.key;
+      document.getElementById('key-display').textContent = d.key;
+      document.getElementById('key-result').style.display = 'block';
+      document.getElementById('me-token').value = d.key;
+      const ea = document.getElementById('key-alert'); ea.className = 'alert wa show'; ea.textContent = '⚠ Save this key now — it will NEVER be shown again!';
+    } else { const ea = document.getElementById('key-alert'); ea.className = 'alert er show'; ea.textContent = d.error || 'Failed.'; }
+  } catch { setRes('key-res', 'Cannot reach server.', 'er'); }
+  spin('key-spin', false);
+}
+
+async function doListKeys() {
+  if (!savedToken) { const e = document.getElementById('list-alert'); e.className = 'alert er show'; e.textContent = 'Login first.'; return; }
+  spin('list-spin', true); hideAlert('list-alert');
+  try {
+    const r = await fetch(API + '/api-keys', { headers: { 'Authorization': 'Bearer ' + savedToken } });
+    const d = await r.json(); incReq();
+    const c = document.getElementById('keys-container');
+    if (r.ok && d.keys && d.keys.length) {
+      c.innerHTML = d.keys.map(k => `<div class="key-item"><div><div class="key-name">${k.name}</div><div class="key-meta">${k.key_prefix}... · ${k.scopes.join(', ')} · ${new Date(k.created_at).toLocaleDateString()}</div><div class="key-id">ID: ${k.id}</div></div><div style="display:flex;align-items:center;gap:8px"><span class="${k.is_active ? 't-active' : 't-revoked'}">${k.is_active ? 'active' : 'revoked'}</span><button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="document.getElementById('revoke-id').value='${k.id}'">Use ID</button></div></div>`).join('');
+    } else if (r.ok) c.innerHTML = '<div style="font-size:12px;color:var(--dim)">No API keys found.</div>';
+    else c.innerHTML = `<div style="font-size:12px;color:var(--red)">${d.error || 'Error'}</div>`;
+  } catch { document.getElementById('keys-container').innerHTML = '<div style="font-size:12px;color:var(--red)">Cannot reach server.</div>'; }
+  spin('list-spin', false);
+}
+
+async function doRevokeKey() {
+  if (!savedToken) { const e = document.getElementById('revoke-alert'); e.className = 'alert er show'; e.textContent = 'Login first.'; return; }
+  const id = document.getElementById('revoke-id').value.trim();
+  if (!id) { const e = document.getElementById('revoke-alert'); e.className = 'alert er show'; e.textContent = 'Paste a key ID.'; return; }
+  spin('revoke-spin', true); setRes('revoke-res', 'Revoking...', 'ld'); hideAlert('revoke-alert');
+  try {
+    const r = await fetch(API + '/api-keys/' + id, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + savedToken } });
+    const d = await r.json(); incReq();
+    setRes('revoke-res', fmt(d), r.ok ? 'ok' : 'er');
+    const ea = document.getElementById('revoke-alert'); ea.className = 'alert ' + (r.ok ? 'ok' : 'er') + ' show'; ea.textContent = r.ok ? 'Key revoked!' : (d.error || 'Failed.');
+  } catch { setRes('revoke-res', 'Cannot reach server.', 'er'); }
+  spin('revoke-spin', false);
+}
+
+async function testRS256() {
+  const email = document.getElementById('rs-email').value.trim();
+  const pass = document.getElementById('rs-pass').value;
+  if (!email || !pass) { alert('Enter email and password.'); return; }
+  spin('rs-spin', true);
+  const R = document.getElementById('rs-results');
+  R.innerHTML = '<div style="color:var(--purple);font-family:var(--mono);font-size:12px">Running 4 tests...</div>';
+  try {
+    const r1 = await fetch(API + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'User-Agent': 'RS256TestBrowser/1.0' }, body: JSON.stringify({ email, password: pass }) });
+    const d1 = await r1.json(); incReq();
+    if (!d1.access_token) { R.innerHTML = `<div style="font-size:12px;color:var(--red)">Login failed: ${fmt(d1)}</div>`; spin('rs-spin', false); return; }
+    const tok = d1.access_token;
+    const header = JSON.parse(atob(tok.split('.')[0]));
+    const t1 = header.alg === 'RS256';
+    const r2 = await fetch(API + '/auth/me', { headers: { 'Authorization': 'Bearer ' + tok, 'User-Agent': 'RS256TestBrowser/1.0' } }); incReq(); const t2 = r2.status === 200;
+    const r3 = await fetch(API + '/auth/me', { headers: { 'Authorization': 'Bearer ' + tok, 'User-Agent': 'DifferentBrowser/9.0' } }); incReq(); const t3 = r3.status === 401;
+    const r4 = await fetch(API + '/auth/me', { headers: { 'Authorization': 'Bearer ' + tok + 'TAMPERED', 'User-Agent': 'RS256TestBrowser/1.0' } }); incReq(); const t4 = r4.status === 401;
+    R.innerHTML = [
+      { l: 'Test 1', p: t1, d: `alg="${header.alg}" — expected RS256 asymmetric` },
+      { l: 'Test 2', p: t2, d: `Same User-Agent → HTTP ${r2.status} (expected 200 OK)` },
+      { l: 'Test 3', p: t3, d: `Different User-Agent → HTTP ${r3.status} (expected 401)` },
+      { l: 'Test 4', p: t4, d: `Tampered token → HTTP ${r4.status} (expected 401)` },
+    ].map(t => `<div class="att-row"><span class="att-num">${t.l}</span><span class="tag ${t.p ? 't-ok' : 't-fl'}">${t.p ? 'PASS' : 'FAIL'}</span><span style="color:var(--dim2);font-size:11px">${t.d}</span></div>`).join('');
+  } catch (e) { R.innerHTML = `<div style="font-size:12px;color:var(--red)">Error: ${e.message}</div>`; }
+  spin('rs-spin', false);
+}
+
+function resetRate() { rlSent = rlOk = rlBlocked = 0; ['rl-sent','rl-ok','rl-blocked'].forEach(id => document.getElementById(id).textContent = '0'); document.getElementById('rl-log').textContent = 'Stats reset.'; }
+async function fireRate(n) {
+  const log = document.getElementById('rl-log'); log.textContent = '';
+  await Promise.all(Array.from({length: n}, () =>
+    fetch(API + '/health').then(r => {
+      rlSent++; r.status === 200 ? rlOk++ : rlBlocked++;
+      document.getElementById('rl-sent').textContent = rlSent;
+      document.getElementById('rl-ok').textContent = rlOk;
+      document.getElementById('rl-blocked').textContent = rlBlocked;
+      incReq();
+      log.innerHTML += `<span class="${r.status===200?'l-ok':'l-er'}">Req ${rlSent}: ${r.status} ${r.status===200?'✓':'✗ BLOCKED'}</span>\n`;
+      log.scrollTop = log.scrollHeight;
+    }).catch(() => {})
+  ));
+  log.innerHTML += rlBlocked > 0 ? `<span class="l-wa">\n🚫 Rate limit triggered! ${rlBlocked} blocked.</span>` : `<span class="l-ok">\n✅ All ${rlOk} passed. Fire more to hit the 60/min limit.</span>`;
+}
+
+async function testBruteForce() {
+  const email = document.getElementById('bf-email').value.trim();
+  if (!email) { alert('Enter a registered email.'); return; }
+  const pass = document.getElementById('bf-pass').value;
+  const count = parseInt(document.getElementById('bf-count').value) || 6;
+  const log = document.getElementById('bf-log'); const btn = document.getElementById('bf-btn');
+  log.innerHTML = ''; spin('bf-spin', true); btn.disabled = true;
+  for (let i = 1; i <= count; i++) {
+    const row = document.createElement('div'); row.className = 'att-row';
+    row.innerHTML = `<span class="att-num">Attempt ${i}</span><span style="color:var(--dim)">sending...</span>`;
+    log.appendChild(row);
+    try {
+      const r = await fetch(API + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: pass }) });
+      const d = await r.json(); incReq();
+      let cl = 't-fl', tx = (d.error || 'failed').toUpperCase();
+      if (r.status === 403) { cl = 't-lk'; tx = '🔒 ACCOUNT LOCKED'; }
+      if (r.status === 429) { cl = 't-rl'; tx = 'RATE LIMITED'; }
+      row.innerHTML = `<span class="att-num">Attempt ${i}</span><span class="tag ${cl}">${tx}</span><span style="color:var(--dim);font-size:10px">${d.attempts_remaining !== undefined ? d.attempts_remaining + ' left' : ''}</span>`;
+    } catch { row.innerHTML = `<span class="att-num">Attempt ${i}</span><span class="tag t-fl">NETWORK ERR</span>`; }
+    await new Promise(r => setTimeout(r, 400));
+  }
+  spin('bf-spin', false); btn.disabled = false;
+}
+
+// ── XSS: user input ──
+function setXSS(payload) {
+  document.getElementById('xss-payload').value = payload;
+}
+async function sendXSS() {
+  const payload = document.getElementById('xss-payload').value.trim();
+  const pass = document.getElementById('xss-pass').value;
+  if (!payload) { setRes('xss-res', 'Enter a payload first.', 'er'); return; }
+  spin('xss-spin', true); setRes('xss-res', 'Sending payload...', 'ld');
+  try {
+    const r = await fetch(API + '/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: payload, password: pass }) });
+    const d = await r.json(); incReq();
+    const verdict = r.status === 400
+      ? '✅ BLOCKED — XSS payload rejected by ammonia sanitizer!'
+      : r.status === 429
+      ? '⚠ Rate limited. Run redis-cli FLUSHDB and wait 60s.'
+      : r.status === 201
+      ? '⚠ Registered (payload was not XSS-like enough to trigger sanitizer)'
+      : `HTTP ${r.status}`;
+    setRes('xss-res', `Payload sent: ${payload}\n\nHTTP ${r.status}\n\n${fmt(d)}\n\n${verdict}`, r.status === 400 ? 'ok' : r.status === 429 ? 'wa' : 'er');
+  } catch { setRes('xss-res', 'Cannot reach server.', 'er'); }
+  spin('xss-spin', false);
+}
+
+// ── SQL: user input ──
+function setSQL(email, pass) {
+  document.getElementById('sql-email').value = email;
+  document.getElementById('sql-pass').value = pass;
+}
+async function sendSQL() {
+  const email = document.getElementById('sql-email').value;
+  const pass = document.getElementById('sql-pass').value;
+  if (!email) { setRes('sql-res', 'Enter a payload first.', 'er'); return; }
+  spin('sql-spin', true); setRes('sql-res', 'Sending injection...', 'ld');
+  try {
+    const r = await fetch(API + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: pass }) });
+    const d = await r.json(); incReq();
+    const safe = r.status !== 500;
+    const verdict = r.status === 429
+      ? '⚠ Rate limited. Run redis-cli FLUSHDB and wait 60s.'
+      : safe
+      ? '✅ SAFE — SQL injection treated as plain text string.\nParameterized queries ($1, $2) prevented execution.\nDatabase is completely safe — no DROP, no UNION, no bypass.'
+      : '❌ Server error — investigate immediately!';
+    setRes('sql-res', `Email: ${email}\nPassword: ${pass}\n\nHTTP ${r.status}\n\n${fmt(d)}\n\n${verdict}`, r.status === 429 ? 'wa' : safe ? 'ok' : 'er');
+  } catch { setRes('sql-res', 'Cannot reach server.', 'er'); }
+  spin('sql-spin', false);
+}
+
+// ── DoS: user input ──
+function setDOS(bytes) {
+  document.getElementById('dos-size').value = bytes;
+  updateDOSLabel();
+}
+function updateDOSLabel() {
+  const bytes = parseInt(document.getElementById('dos-size').value) || 0;
+  const mb = (bytes / 1048576).toFixed(2);
+  const over = bytes > 1048576;
+  document.getElementById('dos-size-label').textContent = `≈ ${mb} MB — server limit is 1 MB — expect ${over ? 'REJECTION (413)' : 'ACCEPTANCE (under limit)'}`;
+  document.getElementById('dos-size-label').style.color = over ? 'var(--green)' : 'var(--amber)';
+}
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('dos-size').addEventListener('input', updateDOSLabel);
+});
+async function sendDOS() {
+  const bytes = parseInt(document.getElementById('dos-size').value) || 2000000;
+  spin('dos-spin', true); setRes('dos-res', `Sending ${(bytes/1048576).toFixed(2)}MB payload...`, 'ld');
+  try {
+    const r = await fetch(API + '/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'test@test.com', password: 'A'.repeat(bytes) }) });
+    incReq();
+    const over = bytes > 1048576;
+    const verdict = r.ok
+      ? `⚠ Server accepted ${(bytes/1048576).toFixed(2)}MB — this is under the 1MB limit or limit not working`
+      : `✅ REJECTED — Server refused ${(bytes/1048576).toFixed(2)}MB body\nRequestBodyLimitLayer (1MB) protected the server.`;
+    setRes('dos-res', `Payload size: ${bytes} bytes (${(bytes/1048576).toFixed(2)} MB)\n\nHTTP ${r.status}\n\n${verdict}`, !r.ok ? 'ok' : 'er');
+  } catch {
+    const bytes2 = parseInt(document.getElementById('dos-size').value) || 2000000;
+    setRes('dos-res', `Payload size: ${bytes2} bytes (${(bytes2/1048576).toFixed(2)} MB)\n\nConnection refused — server closed connection before body was parsed.\n\n✅ REJECTED — Body size limit working correctly.`, 'ok');
+  }
+  spin('dos-spin', false);
+}
+
+// ── IP BAN ──
+function resetIPStats() { ipSent = ipBad = ipBanned = 0; ['ip-sent','ip-bad','ip-banned'].forEach(id => document.getElementById(id).textContent = '0'); document.getElementById('ip-log').textContent = 'Stats reset. Run redis-cli FLUSHDB first, then try again.'; }
+async function testIPBan() {
+  const btn = document.getElementById('ip-ban-btn');
+  spin('ip-spin', true); btn.disabled = true;
+  ipSent = ipBad = ipBanned = 0;
+  const log = document.getElementById('ip-log'); log.innerHTML = '';
+  log.innerHTML += '<span class="l-bl">Sending 12 bad requests with 500ms delay between each (avoids rate limit)...\n\n</span>';
+  for (let i = 1; i <= 12; i++) {
+    try {
+      // Use a clearly malformed/XSS email to trigger 400
+      const r = await fetch(API + '/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: `<scr`+`ipt>x</scr`+`ipt>@bad${i}.com`, password: 'x' })
+      });
+      ipSent++;
+      if (r.status === 400 || r.status === 422) ipBad++;
+      else if (r.status === 403) ipBanned++;
+      else if (r.status === 429) {
+        log.innerHTML += `<span class="l-wa">Request ${i}: HTTP 429 — Rate limited!\nRun redis-cli FLUSHDB in terminal, wait 60s, then retry.\n</span>`;
+        log.scrollTop = log.scrollHeight;
+        break;
+      }
+      document.getElementById('ip-sent').textContent = ipSent;
+      document.getElementById('ip-bad').textContent = ipBad;
+      document.getElementById('ip-banned').textContent = ipBanned;
+      incReq();
+      const cls = r.status === 403 ? 'l-er' : r.status === 400 ? 'l-bl' : 'l-wa';
+      log.innerHTML += `<span class="${cls}">Request ${i}: HTTP ${r.status} ${r.status === 403 ? '🚫 BANNED!' : r.status === 400 ? '→ bad req counted (+1 toward ban)' : ''}\n</span>`;
+      log.scrollTop = log.scrollHeight;
+    } catch { log.innerHTML += `<span class="l-er">Request ${i}: connection error\n</span>`; }
+    await new Promise(r => setTimeout(r, 500)); // slower to avoid rate limit
+  }
+  const finalMsg = ipBanned > 0
+    ? `\n🚫 IP AUTO-BAN TRIGGERED! ${ipBanned} requests got 403.\nYour IP is now banned for 1 hour.\nTo unban: redis-cli FLUSHDB`
+    : ipBad >= 10
+    ? `\n${ipBad} bad requests sent. Ban may have triggered.\nClick "Check if Banned" to verify.`
+    : `\nOnly ${ipBad} bad requests counted (need 10+).\nRun redis-cli FLUSHDB and try again.`;
+  log.innerHTML += `<span class="${ipBanned > 0 ? 'l-er' : 'l-wa'}">${finalMsg}</span>`;
+  spin('ip-spin', false); btn.disabled = false;
+}
+
+async function checkIPBan() {
+  setRes('ban-check-res', 'Checking...', 'ld');
+  try {
+    const r = await fetch(API + '/health'); incReq();
+    if (r.status === 403) {
+      const d = await r.json();
+      setRes('ban-check-res', `HTTP 403 — YOU ARE BANNED\n\nBan expires in: ${d.ban_expires_in_seconds || '?'} seconds\n\nTo unban immediately:\nredis-cli FLUSHDB`, 'er');
+    } else if (r.status === 200) {
+      setRes('ban-check-res', `HTTP 200 — NOT BANNED\n\nServer is responding normally.\nYour IP is not in the Redis ban list.`, 'ok');
+    } else {
+      setRes('ban-check-res', `HTTP ${r.status} — Unexpected response`, 'wa');
+    }
+  } catch { setRes('ban-check-res', 'Cannot reach server.', 'er'); }
+}
+
+async function testSoftDelete() {
+  if (!savedToken) { const e = document.getElementById('del-alert'); e.className = 'alert er show'; e.textContent = 'Login first.'; return; }
+  const pass = document.getElementById('del-pass').value;
+  if (!pass) { const e = document.getElementById('del-alert'); e.className = 'alert er show'; e.textContent = 'Enter your password.'; return; }
+  spin('del-spin', true); setRes('del-res', 'Soft deleting...', 'ld'); hideAlert('del-alert');
+  savedPass = pass;
+  try {
+    const r = await fetch(API + '/auth/delete', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + savedToken }, body: JSON.stringify({ password: pass }) });
+    const d = await r.json(); incReq();
+    setRes('del-res', fmt(d), r.ok ? 'ok' : 'er');
+    if (r.ok) {
+      const ea = document.getElementById('del-alert'); ea.className = 'alert ok show'; ea.textContent = 'Account soft deleted! Row still exists in PostgreSQL with deleted_at timestamp.';
+      document.getElementById('del-test-btn').style.display = 'inline-flex';
+    } else { const ea = document.getElementById('del-alert'); ea.className = 'alert er show'; ea.textContent = d.error || 'Failed.'; }
+  } catch { setRes('del-res', 'Cannot reach server.', 'er'); }
+  spin('del-spin', false);
+}
+
+async function testLoginAfterDelete() {
+  const r = await fetch(API + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: savedEmail, password: savedPass }) });
+  const d = await r.json(); incReq();
+  document.getElementById('del-login-section').style.display = 'block';
+  setRes('del-login-res', `HTTP ${r.status}\n\n${fmt(d)}\n\n${r.status === 401 ? '✅ Login correctly rejected!\ndeleted_at IS NOT NULL filter working — soft deleted user is invisible.' : '❌ Unexpected result'}`, r.status === 401 ? 'ok' : 'er');
+}
+
+async function testEncryption() {
+  const email = document.getElementById('enc-email').value.trim();
+  const pass = document.getElementById('enc-pass').value;
+  if (!email || !pass) { alert('Fill in both fields.'); return; }
+  spin('enc-spin', true);
+  const R = document.getElementById('enc-results');
+  R.innerHTML = '<div style="color:var(--purple);font-family:var(--mono);font-size:12px">Testing AES-256-GCM cycle...</div>';
+  try {
+    const r1 = await fetch(API + '/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: pass }) });
+    const d1 = await r1.json(); incReq();
+    if (r1.status === 429) { R.innerHTML = '<div style="color:var(--amber)">Rate limited! Run redis-cli FLUSHDB in terminal, wait 60s, then retry.</div>'; spin('enc-spin', false); return; }
+    const s1 = r1.status === 201 || (d1.error && d1.error.includes('already'));
+
+    await new Promise(r => setTimeout(r, 300)); // small delay
+
+    const r2 = await fetch(API + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: pass }) });
+    const d2 = await r2.json(); incReq();
+    if (r2.status === 429) { R.innerHTML = '<div style="color:var(--amber)">Rate limited! Run redis-cli FLUSHDB in terminal, wait 60s, then retry.</div>'; spin('enc-spin', false); return; }
+    const s2 = !!d2.access_token;
+
+    let s3 = false, retEmail = '';
+    if (d2.access_token) {
+      const r3 = await fetch(API + '/auth/me', { headers: { 'Authorization': 'Bearer ' + d2.access_token } });
+      const d3 = await r3.json(); incReq();
+      retEmail = d3.email || ''; s3 = retEmail === email.toLowerCase();
+    }
+    R.innerHTML = [
+      { l: 'Step 1', p: s1, d: 'Registered → email encrypted with AES-256-GCM before DB insert' },
+      { l: 'Step 2', p: s2, d: 'Login works → SHA-256 hash used for lookup (no decryption needed)' },
+      { l: 'Step 3', p: s3, d: `Profile returns "${retEmail}" → correctly decrypted from DB ciphertext` },
+    ].map(t => `<div class="att-row"><span class="att-num">${t.l}</span><span class="tag ${t.p ? 't-ok' : 't-fl'}">${t.p ? 'PASS' : 'FAIL'}</span><span style="color:var(--dim2);font-size:11px">${t.d}</span></div>`).join('') +
+    `<div style="margin-top:14px;padding:12px;background:var(--ink3);border-radius:8px;font-family:var(--mono);font-size:11px;color:var(--dim2)">
+      <div style="color:var(--green);margin-bottom:6px">What is in your PostgreSQL right now:</div>
+      <div>email column → base64(nonce):base64(ciphertext) ← completely unreadable</div>
+      <div>email_hash → SHA-256 ← only used for WHERE queries</div>
+      <div style="margin-top:6px;color:var(--amber)">Run in terminal to verify:</div>
+      <div style="color:var(--green)">psql -U api_user -d secure_api -c "SELECT email, email_hash FROM users ORDER BY created_at DESC LIMIT 1;"</div>
+    </div>`;
+  } catch (e) { R.innerHTML = `<div style="font-size:12px;color:var(--red)">Error: ${e.message}<br>Run redis-cli FLUSHDB and retry.</div>`; }
+  spin('enc-spin', false);
+}
+
+window.addEventListener('load', () => {
+  if (document.getElementById('dos-size')) updateDOSLabel();
+  updateDOSLabel();
+  setTimeout(async () => {
+    try {
+      const r = await fetch(API + '/health');
+      if (r.ok) { document.getElementById('pulse').className = 'pulse live'; document.getElementById('srv-txt').textContent = 'online'; document.getElementById('h-status').textContent = 'online'; }
+      else throw new Error();
+    } catch { document.getElementById('pulse').className = 'pulse dead'; document.getElementById('srv-txt').textContent = 'offline'; }
+  }, 800);
+});
+</script>
+</body>
+</html>

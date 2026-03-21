@@ -6,8 +6,9 @@ use axum::{
 use dotenvy::dotenv;
 use redis::Client as RedisClient;
 use std::{env, sync::Arc};
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 use tower_http::limit::RequestBodyLimitLayer;
+
 
 mod db;
 mod middleware;
@@ -42,13 +43,15 @@ async fn main() {
     });
 
     let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+        .allow_origin(tower_http::cors::Any)
+        .allow_methods(tower_http::cors::Any)
+        .allow_headers(tower_http::cors::Any)
+        .allow_credentials(false);
 
     let app = Router::new()
-        .route("/", get(root_handler))
+        // API routes first
         .route("/health", get(health_handler))
+        .route("/api", get(root_handler))
         .route("/auth/register", post(routes::auth::register))
         .route("/auth/login", post(routes::auth::login))
         .route(
@@ -110,14 +113,14 @@ async fn main() {
             middleware::ip_ban::ip_ban_middleware,
         ))
         .with_state(state);
+        // Serve static files (index.html) at root — AFTER all API routes
+       
 
     let port = env::var("PORT").unwrap_or("3000".to_string());
     let addr = format!("0.0.0.0:{}", port);
 
     tracing::info!("Server running on http://{}", addr);
-    tracing::info!("  POST http://localhost:{}/auth/register", port);
-    tracing::info!("  POST http://localhost:{}/auth/login", port);
-    tracing::info!("  GET  http://localhost:{}/auth/me", port);
+    tracing::info!("  Open http://localhost:{}/index.html", port);
 
     let listener = tokio::net::TcpListener::bind(&addr)
         .await

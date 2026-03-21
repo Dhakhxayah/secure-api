@@ -29,7 +29,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 ammonia = "3"
 
 # Body size limiting middleware
-tower-http = { version = "0.5", features = ["cors", "limit"] }
+tower-http = { version = "0.5", features = ["cors", "limit", "fs"] }
 # Encryption — AES-256-GCM for field-level encryption
 aes-gcm = "0.10"
 
