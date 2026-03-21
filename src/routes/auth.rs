@@ -3,39 +3,60 @@ use chrono::Utc;
 use serde_json::{json, Value};
 use std::sync::Arc;
 use uuid::Uuid;
+use sha2::{Digest, Sha256};
 
 use crate::{
-    models::user::{AuthResponse, LoginRequest, RegisterRequest},
+    models::user::{AuthResponse, DeleteAccountRequest, LoginRequest, RegisterRequest},
     utils::{
+        encryption::{decrypt, encrypt},
         jwt::{create_access_token, create_refresh_token},
         password::{hash_password, verify_password},
+        sanitize::{looks_like_xss, sanitize_email, sanitize_text},
     },
     AppState,
 };
 
-// POST /auth/register
 pub async fn register(
     State(state): State<Arc<AppState>>,
     Json(body): Json<RegisterRequest>,
 ) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
 
-    if !body.email.contains('@') || body.email.len() < 5 {
+    if looks_like_xss(&body.email) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "Invalid input detected"})),
+        ));
+    }
+
+    let email = sanitize_email(&body.email);
+
+    if !email.contains('@') || email.len() < 5 {
         return Err((
             StatusCode::BAD_REQUEST,
             Json(json!({"error": "Invalid email format"})),
         ));
     }
 
-    if body.password.len() < 8 {
+    let password = sanitize_text(&body.password, 128)
+        .map_err(|e| (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": e})),
+        ))?;
+
+    if password.len() < 8 {
         return Err((
             StatusCode::BAD_REQUEST,
             Json(json!({"error": "Password must be at least 8 characters"})),
         ));
     }
 
+    let mut hasher = Sha256::new();
+    hasher.update(email.as_bytes());
+    let email_hash = format!("{:x}", hasher.finalize());
+
     let existing = sqlx::query!(
-        "SELECT id FROM users WHERE email = $1",
-        body.email
+        "SELECT id FROM users WHERE email_hash = $1",
+        email_hash
     )
     .fetch_optional(&state.db)
     .await
@@ -51,7 +72,7 @@ pub async fn register(
         ));
     }
 
-    let password_hash = hash_password(&body.password)
+    let password_hash = hash_password(&password)
         .map_err(|e| (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({"error": e})),
@@ -59,13 +80,20 @@ pub async fn register(
 
     let user_id = Uuid::new_v4();
 
+    let encrypted_email = encrypt(&email)
+        .map_err(|e| (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": format!("Encryption failed: {}", e)})),
+        ))?;
+
     sqlx::query!(
         r#"
-        INSERT INTO users (id, email, password_hash, role, created_at, updated_at)
-        VALUES ($1, $2, $3, 'user', NOW(), NOW())
+        INSERT INTO users (id, email, email_hash, password_hash, role, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, 'user', NOW(), NOW())
         "#,
         user_id,
-        body.email,
+        encrypted_email,
+        email_hash,
         password_hash,
     )
     .execute(&state.db)
@@ -96,20 +124,27 @@ pub async fn register(
     ))
 }
 
-// POST /auth/login
 pub async fn login(
     State(state): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
     Json(body): Json<LoginRequest>,
 ) -> Result<(StatusCode, Json<AuthResponse>), (StatusCode, Json<Value>)> {
+
+    let request_headers = &headers;
+
+    let mut hasher = Sha256::new();
+    hasher.update(body.email.to_lowercase().as_bytes());
+    let email_hash = format!("{:x}", hasher.finalize());
 
     let user = sqlx::query!(
         r#"
         SELECT id, email, password_hash, role, is_locked,
                failed_login_attempts, locked_until
         FROM users
-        WHERE email = $1
+        WHERE email_hash = $1
+        AND deleted_at IS NULL
         "#,
-        body.email
+        email_hash
     )
     .fetch_optional(&state.db)
     .await
@@ -120,12 +155,10 @@ pub async fn login(
 
     let user = match user {
         Some(u) => u,
-        None => {
-            return Err((
-                StatusCode::UNAUTHORIZED,
-                Json(json!({"error": "Invalid credentials"})),
-            ))
-        }
+        None => return Err((
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "Invalid credentials"})),
+        )),
     };
 
     if user.is_locked {
@@ -208,13 +241,20 @@ pub async fn login(
     .await
     .ok();
 
-    let access_token = create_access_token(user.id, &user.email, &user.role)
+    let user_agent = request_headers
+        .get("user-agent")
+        .and_then(|v| v.to_str().ok());
+
+    let decrypted_email = decrypt(&user.email)
+        .unwrap_or_else(|_| user.email.clone());
+
+    let access_token = create_access_token(user.id, &decrypted_email, &user.role, user_agent)
         .map_err(|e| (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({"error": e})),
         ))?;
 
-    let refresh_token = create_refresh_token(user.id, &user.email, &user.role)
+    let refresh_token = create_refresh_token(user.id, &decrypted_email, &user.role, user_agent)
         .map_err(|e| (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({"error": e})),
@@ -241,7 +281,6 @@ pub async fn login(
     ))
 }
 
-// GET /auth/me
 pub async fn me(
     State(state): State<Arc<AppState>>,
     axum::Extension(claims): axum::Extension<crate::utils::jwt::Claims>,
@@ -254,7 +293,7 @@ pub async fn me(
         ))?;
 
     let user = sqlx::query!(
-        "SELECT id, email, role, created_at FROM users WHERE id = $1",
+        "SELECT id, email, role, created_at FROM users WHERE id = $1 AND deleted_at IS NULL",
         user_id
     )
     .fetch_optional(&state.db)
@@ -265,12 +304,16 @@ pub async fn me(
     ))?;
 
     match user {
-        Some(u) => Ok(Json(json!({
-            "id": u.id,
-            "email": u.email,
-            "role": u.role,
-            "created_at": u.created_at
-        }))),
+        Some(u) => {
+            let decrypted_email = decrypt(&u.email)
+                .unwrap_or_else(|_| u.email.clone());
+            Ok(Json(json!({
+                "id": u.id,
+                "email": decrypted_email,
+                "role": u.role,
+                "created_at": u.created_at
+            })))
+        },
         None => Err((
             StatusCode::NOT_FOUND,
             Json(json!({"error": "User not found"})),
@@ -278,19 +321,12 @@ pub async fn me(
     }
 }
 
-// POST /auth/logout
-// Adds the token to Redis blacklist so it can't be used again
-// Even if token hasn't expired yet, it will be rejected
 pub async fn logout(
     State(state): State<Arc<AppState>>,
     axum::Extension(claims): axum::Extension<crate::utils::jwt::Claims>,
     axum::Extension(raw_token): axum::Extension<String>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
 
-    // Add token to Redis blacklist
-    // Key: "blacklist:<token>"
-    // Value: "1"
-    // Expiry: same as token expiry so Redis auto-cleans it
     let blacklist_key = format!("blacklist:{}", raw_token);
 
     let mut redis_conn = state.redis
@@ -301,11 +337,9 @@ pub async fn logout(
             Json(json!({"error": "Could not connect to Redis"})),
         ))?;
 
-    // Calculate remaining TTL of the token
     let now = chrono::Utc::now().timestamp() as usize;
     let ttl = if claims.exp > now { claims.exp - now } else { 1 };
 
-    // Store in blacklist until token naturally expires
     let _: () = redis::AsyncCommands::set_ex(
         &mut redis_conn,
         &blacklist_key,
@@ -318,7 +352,6 @@ pub async fn logout(
         Json(json!({"error": "Failed to blacklist token"})),
     ))?;
 
-    // Log the logout
     let user_id = Uuid::parse_str(&claims.sub).ok();
     if let Some(uid) = user_id {
         sqlx::query!(
@@ -334,5 +367,75 @@ pub async fn logout(
 
     Ok(Json(json!({
         "message": "Logged out successfully. Token has been invalidated."
+    })))
+}
+
+pub async fn delete_account(
+    State(state): State<Arc<AppState>>,
+    axum::Extension(claims): axum::Extension<crate::utils::jwt::Claims>,
+    Json(body): Json<DeleteAccountRequest>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+
+    let user_id = Uuid::parse_str(&claims.sub)
+        .map_err(|_| (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "Invalid user ID"})),
+        ))?;
+
+    let user = sqlx::query!(
+        "SELECT id, password_hash FROM users WHERE id = $1 AND deleted_at IS NULL",
+        user_id
+    )
+    .fetch_optional(&state.db)
+    .await
+    .map_err(|_| (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(json!({"error": "Database error"})),
+    ))?;
+
+    let user = match user {
+        Some(u) => u,
+        None => return Err((
+            StatusCode::NOT_FOUND,
+            Json(json!({"error": "User not found"})),
+        )),
+    };
+
+    let valid = verify_password(&body.password, &user.password_hash)
+        .map_err(|_| (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": "Password verification failed"})),
+        ))?;
+
+    if !valid {
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "Incorrect password"})),
+        ));
+    }
+
+    sqlx::query!(
+        "UPDATE users SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1",
+        user_id
+    )
+    .execute(&state.db)
+    .await
+    .map_err(|_| (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(json!({"error": "Failed to delete account"})),
+    ))?;
+
+    sqlx::query!(
+        r#"INSERT INTO audit_logs (id, user_id, action, details, created_at)
+           VALUES ($1, $2, 'ACCOUNT_DELETED', 'User soft deleted their account', NOW())"#,
+        Uuid::new_v4(),
+        user_id,
+    )
+    .execute(&state.db)
+    .await
+    .ok();
+
+    Ok(Json(json!({
+        "message": "Account successfully deleted"
     })))
 }

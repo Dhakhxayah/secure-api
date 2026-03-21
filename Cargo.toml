@@ -14,7 +14,7 @@ sqlx = { version = "0.7", features = [
     "macros"
 ]}
 redis = { version = "0.24", features = ["tokio-comp"] }
-jsonwebtoken = "9"
+jsonwebtoken = { version = "9", features = [] }
 argon2 = "0.5"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -22,7 +22,21 @@ uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 dotenvy = "0.15"
 tower = "0.4"
-tower-http = { version = "0.5", features = ["cors"] }
 http = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# HTML sanitization — strips XSS payloads
+ammonia = "3"
+
+# Body size limiting middleware
+tower-http = { version = "0.5", features = ["cors", "limit"] }
+# Encryption — AES-256-GCM for field-level encryption
+aes-gcm = "0.10"
+
+# Random number generation for encryption nonces
+rand = "0.8"
+
+# Base64 encoding — store encrypted bytes as text in DB
+base64 = "0.21"
+sha2 = "0.10"
+hex = "0.4"

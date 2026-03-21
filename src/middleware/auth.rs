@@ -10,7 +10,7 @@ use redis::AsyncCommands;
 use serde_json::json;
 use std::sync::Arc;
 
-use crate::{utils::jwt::verify_token, AppState};
+use crate::{utils::jwt::verify_token_with_fingerprint, AppState};
 
 pub async fn auth_middleware(
     State(state): State<Arc<AppState>>,
@@ -18,20 +18,40 @@ pub async fn auth_middleware(
     next: Next,
 ) -> Response {
 
-    // Extract token as owned String immediately
-    // This drops the borrow on `request` so we can mutate it later
-    
-    // Check authorization header exists
+    // CHECK API KEY first — X-API-Key header
+    if let Some(api_key_value) = request
+        .headers()
+        .get("X-API-Key")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string())
+    {
+        match crate::routes::api_keys::verify_api_key(&state, &api_key_value).await {
+            Some(claims) => {
+                request.extensions_mut().insert(claims);
+                request.extensions_mut().insert(api_key_value);
+                return next.run(request).await;
+            }
+            None => {
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    Json(json!({"error": "Invalid or expired API key"})),
+                )
+                    .into_response();
+            }
+        }
+    }
+
+    // CHECK JWT Bearer token
     let auth_value = match request
         .headers()
         .get(header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
     {
-        Some(v) => v.to_string(), // owned String — no borrow kept
+        Some(v) => v.to_string(),
         None => {
             return (
                 StatusCode::UNAUTHORIZED,
-                Json(json!({"error": "Missing Authorization header"})),
+                Json(json!({"error": "Missing Authorization header or X-API-Key"})),
             )
                 .into_response();
         }
@@ -49,7 +69,7 @@ pub async fn auth_middleware(
 
     let token = auth_value["Bearer ".len()..].to_string();
 
-    // CHECK 1: Is token blacklisted?
+    // Check token blacklist
     let blacklist_key = format!("blacklist:{}", token);
     if let Ok(mut conn) = state.redis.get_async_connection().await {
         let blacklisted: Option<String> = conn
@@ -68,10 +88,16 @@ pub async fn auth_middleware(
         }
     }
 
-    // CHECK 2: Is token valid and not expired?
-    match verify_token(&token) {
+    // Verify token signature and fingerprint
+    let user_agent = request
+        .headers()
+        .get("user-agent")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("unknown")
+        .to_string();
+
+    match verify_token_with_fingerprint(&token, &user_agent) {
         Ok(claims) => {
-            // Now safe to mutate request — no borrows active
             request.extensions_mut().insert(claims);
             request.extensions_mut().insert(token);
             next.run(request).await
